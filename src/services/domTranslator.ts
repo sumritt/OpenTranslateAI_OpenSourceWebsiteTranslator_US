@@ -111,23 +111,41 @@ export class DOMTranslator {
         onProgress?.(100);
       } else {
         const batchSize = 25;
-        const totalBatches = Math.ceil(this.textNodes.length / batchSize);
-        const allTranslations: string[] = [];
+        const concurrency = 5;
 
+        const chunks: { nodes: TextNodeData[]; start: number }[] = [];
         for (let i = 0; i < this.textNodes.length; i += batchSize) {
-          const batch = this.textNodes.slice(i, i + batchSize);
-          const texts = batch.map((nodeData) => nodeData.originalText);
-
-          const translated = await this.translationService.translateBatch(texts, targetLang);
-
-          batch.forEach((nodeData, index) => {
-            nodeData.node.textContent = translated[index];
-            allTranslations.push(translated[index]);
-          });
-
-          const currentBatch = Math.floor(i / batchSize) + 1;
-          onProgress?.((currentBatch / totalBatches) * 100);
+          chunks.push({ nodes: this.textNodes.slice(i, i + batchSize), start: i });
         }
+
+        const allTranslations: string[] = new Array(this.textNodes.length);
+        let completed = 0;
+        let nextChunk = 0;
+
+        const worker = async (): Promise<void> => {
+          while (true) {
+            const idx = nextChunk++;
+            if (idx >= chunks.length) return;
+            const chunk = chunks[idx];
+            const texts = chunk.nodes.map((nodeData) => nodeData.originalText);
+
+            const translated = await this.translationService.translateBatch(texts, targetLang);
+
+            chunk.nodes.forEach((nodeData, j) => {
+              nodeData.node.textContent = translated[j];
+              allTranslations[chunk.start + j] = translated[j];
+            });
+
+            completed++;
+            onProgress?.((completed / chunks.length) * 100);
+          }
+        };
+
+        const pool = Array.from(
+          { length: Math.min(concurrency, chunks.length) },
+          () => worker(),
+        );
+        await Promise.all(pool);
 
         this.translationCache[targetLang] = allTranslations;
         this.currentLang = targetLang;

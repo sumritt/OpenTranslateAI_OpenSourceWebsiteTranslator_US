@@ -12,6 +12,7 @@
     defaultLang: script.getAttribute('data-default') || 'en',
     targetElementId: script.getAttribute('data-element') || '',
     batchSize: 25,
+    concurrency: parseInt(script.getAttribute('data-concurrency') || '5', 10) || 5,
   };
 
   var ALL_LANGUAGES = [
@@ -100,13 +101,28 @@
         textNodes.forEach(function (n) { n.node.textContent = n.originalText; });
         setDir(CONFIG.defaultLang);
       } else {
+        var chunks = [];
         for (var i = 0; i < textNodes.length; i += CONFIG.batchSize) {
-          var batch = textNodes.slice(i, i + CONFIG.batchSize);
-          var texts = batch.map(function (n) { return n.originalText; });
-          var out = await translateBatch(texts, target);
-          batch.forEach(function (n, idx) { n.node.textContent = out[idx]; });
-          ui.setProgress(Math.min(((i + CONFIG.batchSize) / textNodes.length) * 100, 100));
+          chunks.push(textNodes.slice(i, i + CONFIG.batchSize));
         }
+        var completed = 0;
+        var nextChunk = 0;
+        var worker = async function () {
+          while (true) {
+            var idx = nextChunk++;
+            if (idx >= chunks.length) return;
+            var batch = chunks[idx];
+            var texts = batch.map(function (n) { return n.originalText; });
+            var out = await translateBatch(texts, target);
+            batch.forEach(function (n, j) { n.node.textContent = out[j]; });
+            completed++;
+            ui.setProgress((completed / chunks.length) * 100);
+          }
+        };
+        var poolSize = Math.min(CONFIG.concurrency, chunks.length);
+        var pool = [];
+        for (var w = 0; w < poolSize; w++) pool.push(worker());
+        await Promise.all(pool);
         setDir(target);
       }
       currentLang = target;
