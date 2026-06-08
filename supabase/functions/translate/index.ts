@@ -42,7 +42,17 @@ async function callOpenRouter(
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, temperature: 0, messages }),
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      messages,
+      // Translation needs no chain-of-thought. Disable "thinking" so the model
+      // does not spend seconds generating reasoning tokens per request, which
+      // otherwise dominates latency. Works where thinking is optional, e.g.
+      // Gemini 2.5 Flash. NOTE: Gemini 3.x makes thinking mandatory and returns
+      // HTTP 400 for this field — do not point OPENROUTER_MODEL at a 3.x model.
+      reasoning: { enabled: false },
+    }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
