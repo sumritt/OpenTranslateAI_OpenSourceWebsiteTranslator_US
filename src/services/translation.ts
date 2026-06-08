@@ -1,116 +1,78 @@
 export interface TranslationConfig {
-  apiUrl: string;
-  apiKey?: string;
+  proxyUrl: string;
+  token?: string;
 }
 
 export interface TranslationCache {
   [key: string]: string;
 }
 
-const DEFAULT_API_URL = 'https://libretranslate.com/translate';
-
 export class TranslationService {
   private config: TranslationConfig;
   private cache: TranslationCache = {};
 
-  constructor(config?: Partial<TranslationConfig>) {
-    this.config = {
-      apiUrl: config?.apiUrl || DEFAULT_API_URL,
-      apiKey: config?.apiKey,
-    };
+  constructor(config: TranslationConfig) {
+    this.config = config;
   }
 
-  private getCacheKey(text: string, source: string, target: string): string {
-    return `${source}-${target}-${text}`;
+  private cacheKey(text: string, target: string): string {
+    return `${target}::${text.trim()}`;
   }
 
-  async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
-    if (!text.trim()) return text;
-    if (sourceLang === targetLang) return text;
+  async translateBatch(texts: string[], target: string): Promise<string[]> {
+    if (texts.length === 0) return [];
 
-    const cacheKey = this.getCacheKey(text, sourceLang, targetLang);
-    if (this.cache[cacheKey]) {
-      return this.cache[cacheKey];
+    const allCached = texts.every((t) => this.cache[this.cacheKey(t, target)] !== undefined);
+    if (allCached) {
+      return texts.map((t) => this.cache[this.cacheKey(t, target)]);
     }
 
     const maxRetries = 2;
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (this.config.token) headers['X-Widget-Token'] = this.config.token;
 
-        const response = await fetch(this.config.apiUrl, {
+        const response = await fetch(this.config.proxyUrl, {
           method: 'POST',
-          body: JSON.stringify({
-            q: text,
-            source: sourceLang,
-            target: targetLang,
-            format: 'text',
-            api_key: this.config.apiKey,
-          }),
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
+          body: JSON.stringify({ texts, target }),
           signal: controller.signal,
         });
 
-        clearTimeout(timeoutId);
-
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || `Translation API error: ${response.status} ${response.statusText}`
-          );
+          throw new Error(`Translation proxy error: ${response.status}`);
         }
 
         const data = await response.json();
-        const translated = data.translatedText;
-
-        if (!translated) {
-          throw new Error('No translation returned from API');
+        const translations = data?.translations;
+        if (!Array.isArray(translations) || translations.length !== texts.length) {
+          throw new Error('Malformed translation response');
         }
 
-        this.cache[cacheKey] = translated;
-        return translated;
+        texts.forEach((t, i) => {
+          this.cache[this.cacheKey(t, target)] = translations[i];
+        });
+        return translations;
       } catch (error) {
         lastError = error as Error;
-        console.error(`Translation attempt ${attempt + 1} failed:`, error);
-
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
         }
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
-    console.error('Translation failed after all retries:', lastError);
-    throw lastError || new Error('Translation failed');
-  }
-
-  async translateBatch(
-    texts: string[],
-    sourceLang: string,
-    targetLang: string
-  ): Promise<string[]> {
-    const promises = texts.map((text) => this.translate(text, sourceLang, targetLang));
-    return Promise.all(promises);
+    console.error('Translation failed after retries:', lastError);
+    throw lastError ?? new Error('Translation failed');
   }
 
   clearCache(): void {
     this.cache = {};
-  }
-
-  async testConnection(): Promise<{ success: boolean; error?: string }> {
-    try {
-      const testText = 'Hello';
-      await this.translate(testText, 'en', 'es');
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
   }
 }
