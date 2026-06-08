@@ -35,6 +35,13 @@ describe('validateRequest', () => {
     const texts = ['a'.repeat(DEFAULT_CAPS.maxChars + 1)];
     expect(validateRequest({ texts, target: 'th' }).ok).toBe(false);
   });
+
+  it('rejects when the total payload exceeds the aggregate cap', () => {
+    // 5 texts of 4001 chars each = 20005 total: each under maxChars, count under maxTexts,
+    // but over maxTotal (20000).
+    const texts = Array.from({ length: 5 }, () => 'a'.repeat(4001));
+    expect(validateRequest({ texts, target: 'th' }).ok).toBe(false);
+  });
 });
 
 describe('isOriginAllowed', () => {

@@ -15,7 +15,7 @@ function corsHeaders(origin: string | null, allowed: string[]): Record<string, s
     ? "*"
     : origin && allowed.includes(origin)
     ? origin
-    : allowed[0] ?? "";
+    : "";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
