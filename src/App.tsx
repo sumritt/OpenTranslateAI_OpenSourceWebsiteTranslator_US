@@ -15,6 +15,7 @@ import { NotFound } from './components/NotFound';
 function App() {
   const [localLang, setLocalLang] = useState<'zh' | 'en' | 'es'>('en');
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
+  const proxyUrl = import.meta.env.VITE_TRANSLATE_PROXY_URL as string;
 
   return (
     <>
@@ -22,6 +23,7 @@ function App() {
         <Route path="/" element={
           <>
             <TranslationWidget
+              proxyUrl={proxyUrl}
               defaultLang="en"
               targetElementId="translatable-content"
               position="top-right"
@@ -32,7 +34,7 @@ function App() {
               }}
               localLanguages={['zh', 'en', 'es']}
             />
-            <TranslationDebug />
+            {import.meta.env.DEV && <TranslationDebug proxyUrl={proxyUrl} />}
             {localLang === 'zh' ? (
               <DemoContent onOpenWaitlist={() => setIsWaitlistOpen(true)} />
             ) : localLang === 'es' ? (

@@ -24,8 +24,8 @@ const LANGUAGES: Language[] = [
 
 interface TranslationWidgetProps {
   defaultLang?: string;
-  apiUrl?: string;
-  apiKey?: string;
+  proxyUrl: string;
+  token?: string;
   targetElementId?: string;
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   onLanguageChange?: (lang: string) => void;
@@ -34,8 +34,8 @@ interface TranslationWidgetProps {
 
 export function TranslationWidget({
   defaultLang = 'zh',
-  apiUrl,
-  apiKey,
+  proxyUrl,
+  token,
   targetElementId = 'translatable-content',
   position = 'top-right',
   onLanguageChange,
@@ -53,7 +53,7 @@ export function TranslationWidget({
   useEffect(() => {
     const initTranslator = async () => {
       try {
-        const translationService = new TranslationService({ apiUrl, apiKey });
+        const translationService = new TranslationService({ proxyUrl, token });
         const translator = new DOMTranslator(translationService, defaultLang);
 
         const targetElement = document.getElementById(targetElementId);
@@ -74,7 +74,7 @@ export function TranslationWidget({
     };
 
     initTranslator();
-  }, [apiUrl, apiKey, defaultLang, targetElementId]);
+  }, [proxyUrl, token, defaultLang, targetElementId]);
 
   const handleLanguageChange = async (langCode: string) => {
     if (!domTranslator || isTranslating || !isInitialized) return;
