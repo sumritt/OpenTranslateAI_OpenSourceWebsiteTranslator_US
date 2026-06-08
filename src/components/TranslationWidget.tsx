@@ -128,7 +128,7 @@ export function TranslationWidget({
       const errorMessage = err instanceof Error ? err.message : 'Translation failed';
 
       if (errorMessage.includes('CORS') || errorMessage.includes('network')) {
-        setError('Connection error. Try self-hosting LibreTranslate or check your network.');
+        setError('Connection error. Check your proxy URL and network.');
       } else if (errorMessage.includes('rate limit')) {
         setError('Rate limit reached. Please wait and try again.');
       } else {

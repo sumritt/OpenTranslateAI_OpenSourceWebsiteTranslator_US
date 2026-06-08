@@ -133,9 +133,9 @@ export function TranslationDebug({ proxyUrl }: TranslationDebugProps) {
           </p>
           <ul className="list-disc list-inside space-y-1">
             <li>Check network connection</li>
-            <li>Verify API URL is correct</li>
+            <li>Verify the proxy URL is correct</li>
             <li>Check for CORS restrictions</li>
-            <li>Consider self-hosting LibreTranslate</li>
+            <li>Verify the proxy is deployed and OPENROUTER_API_KEY is set</li>
           </ul>
         </div>
       </div>

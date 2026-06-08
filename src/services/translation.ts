@@ -60,6 +60,7 @@ export class TranslationService {
         return translations;
       } catch (error) {
         lastError = error as Error;
+        if (lastError.message === 'Malformed translation response') break;
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
         }
