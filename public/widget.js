@@ -1,7 +1,11 @@
 (function () {
   'use strict';
 
-  var script = document.currentScript;
+  var script = document.currentScript || document.querySelector('script[data-proxy]');
+  if (!script) {
+    console.error('[widget.js] cannot locate its <script> tag; ensure the tag has a data-proxy attribute');
+    return;
+  }
   var CONFIG = {
     proxyUrl: script.getAttribute('data-proxy'),
     token: script.getAttribute('data-token') || '',

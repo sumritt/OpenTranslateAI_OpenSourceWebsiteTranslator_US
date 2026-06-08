@@ -53,6 +53,10 @@ export function TranslationWidget({
   useEffect(() => {
     const initTranslator = async () => {
       try {
+        if (!proxyUrl) {
+          setError('Translation proxy URL is not configured (set VITE_TRANSLATE_PROXY_URL)');
+          return;
+        }
         const translationService = new TranslationService({ proxyUrl, token });
         const translator = new DOMTranslator(translationService, defaultLang);
 
