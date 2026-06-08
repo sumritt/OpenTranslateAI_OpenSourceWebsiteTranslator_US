@@ -1,4 +1,6 @@
-import { TranslationService } from './translation';
+interface BatchTranslator {
+  translateBatch(texts: string[], target: string): Promise<string[]>;
+}
 
 interface TextNodeData {
   node: Text;
@@ -10,14 +12,14 @@ interface TranslationCache {
 }
 
 export class DOMTranslator {
-  private translationService: TranslationService;
+  private translationService: BatchTranslator;
   private textNodes: TextNodeData[] = [];
   private originalLang: string;
   private currentLang: string;
   private isTranslating = false;
   private translationCache: TranslationCache = {};
 
-  constructor(translationService: TranslationService, originalLang: string) {
+  constructor(translationService: BatchTranslator, originalLang: string) {
     this.translationService = translationService;
     this.originalLang = originalLang;
     this.currentLang = originalLang;
@@ -108,8 +110,7 @@ export class DOMTranslator {
         this.currentLang = targetLang;
         onProgress?.(100);
       } else {
-        // Translate text nodes in batches
-        const batchSize = 10;
+        const batchSize = 25;
         const totalBatches = Math.ceil(this.textNodes.length / batchSize);
         const allTranslations: string[] = [];
 
@@ -117,11 +118,7 @@ export class DOMTranslator {
           const batch = this.textNodes.slice(i, i + batchSize);
           const texts = batch.map((nodeData) => nodeData.originalText);
 
-          const translated = await this.translationService.translateBatch(
-            texts,
-            this.originalLang,
-            targetLang
-          );
+          const translated = await this.translationService.translateBatch(texts, targetLang);
 
           batch.forEach((nodeData, index) => {
             nodeData.node.textContent = translated[index];
@@ -129,11 +126,9 @@ export class DOMTranslator {
           });
 
           const currentBatch = Math.floor(i / batchSize) + 1;
-          const progress = (currentBatch / totalBatches) * 100;
-          onProgress?.(progress);
+          onProgress?.((currentBatch / totalBatches) * 100);
         }
 
-        // Cache the translations
         this.translationCache[targetLang] = allTranslations;
         this.currentLang = targetLang;
       }
