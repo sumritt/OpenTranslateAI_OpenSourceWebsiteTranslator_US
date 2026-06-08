@@ -88,7 +88,12 @@ export function TranslationWidget({
 
     const isLocalLanguage = localLanguages.includes(langCode);
 
-    if (isLocalLanguage) {
+    // The original language is the untouched DOM, not a pre-written "local" swap.
+    // An AI translation mutates the DOM text in place; selecting the original
+    // language again must route through the translator to restore that text.
+    // Taking the local-swap path for it is a no-op when the original component
+    // is already mounted, which would leave the page stuck in the AI language.
+    if (isLocalLanguage && langCode !== domTranslator.getOriginalLang()) {
       setCurrentLang(langCode);
       onLanguageChange?.(langCode);
       return;
