@@ -5,6 +5,7 @@ import {
   parseAllowedOrigins,
   DEFAULT_CAPS,
 } from './lib';
+import { buildMessages, parseTranslations } from './lib';
 
 describe('validateRequest', () => {
   it('accepts a valid batch', () => {
@@ -60,5 +61,43 @@ describe('parseAllowedOrigins', () => {
   });
   it('handles undefined', () => {
     expect(parseAllowedOrigins(undefined)).toEqual([]);
+  });
+});
+
+describe('buildMessages', () => {
+  it('produces a system + user message with the target language', () => {
+    const msgs = buildMessages(['hi'], 'Thai');
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0].role).toBe('system');
+    expect(msgs[0].content).toContain('Thai');
+    expect(msgs[1].role).toBe('user');
+    expect(msgs[1].content).toBe(JSON.stringify(['hi']));
+  });
+
+  it('mentions auto-detection when no source given', () => {
+    expect(buildMessages(['hi'], 'th')[0].content.toLowerCase()).toContain('detect');
+  });
+});
+
+describe('parseTranslations', () => {
+  it('parses a plain JSON array of the right length', () => {
+    expect(parseTranslations('["สวัสดี","ลาก่อน"]', 2)).toEqual(['สวัสดี', 'ลาก่อน']);
+  });
+
+  it('strips ```json fences', () => {
+    const content = '```json\n["a","b"]\n```';
+    expect(parseTranslations(content, 2)).toEqual(['a', 'b']);
+  });
+
+  it('returns null on length mismatch', () => {
+    expect(parseTranslations('["a"]', 2)).toBeNull();
+  });
+
+  it('returns null on invalid JSON', () => {
+    expect(parseTranslations('not json', 1)).toBeNull();
+  });
+
+  it('returns null when elements are not strings', () => {
+    expect(parseTranslations('[1,2]', 2)).toBeNull();
   });
 });
