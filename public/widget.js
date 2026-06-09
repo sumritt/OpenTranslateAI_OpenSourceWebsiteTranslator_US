@@ -231,7 +231,10 @@
     var bar = root.querySelector('.otw-bar');
 
     function nativeName(code) {
-      var l = LANGUAGES.find(function (x) { return x.code === code; });
+      // Resolve from the full set, not the filtered LANGUAGES, so the button
+      // label still shows a name if currentLang is ever outside the visible list
+      // (mirrors the React widget, which looks up the full LANGUAGES list).
+      var l = ALL_LANGUAGES.find(function (x) { return x.code === code; });
       return l ? l.nativeName : code;
     }
 
