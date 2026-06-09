@@ -204,7 +204,10 @@
       '.otw{position:fixed;top:20px;right:20px;z-index:9999;font-family:-apple-system,Segoe UI,Roboto,sans-serif}' +
       '.otw-btn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 16px;cursor:pointer;box-shadow:0 4px 6px rgba(0,0,0,.1);font-size:14px;font-weight:500}' +
       '.otw-btn:disabled{opacity:.5;cursor:not-allowed}' +
-      '.otw-menu{position:absolute;top:calc(100% + 8px);right:0;width:220px;max-height:380px;overflow:auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 10px 15px rgba(0,0,0,.1);display:none}' +
+      '.otw-menu{position:absolute;top:calc(100% + 8px);right:0;width:220px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 10px 15px rgba(0,0,0,.1);display:none;overflow:hidden}' +
+      '.otw-search{width:100%;box-sizing:border-box;padding:10px 16px;border:none;border-bottom:1px solid #e5e7eb;font-size:14px;outline:none}' +
+      '.otw-list{max-height:320px;overflow:auto}' +
+      '.otw-empty{padding:10px 16px;color:#9ca3af;font-size:13px;display:none}' +
       '.otw-menu.open{display:block}' +
       '.otw-opt{width:100%;padding:10px 16px;border:none;background:#fff;text-align:left;cursor:pointer;display:flex;justify-content:space-between}' +
       '.otw-opt:hover{background:#f9fafb}' +
@@ -232,10 +235,29 @@
       return l ? l.nativeName : code;
     }
 
-    menu.innerHTML = LANGUAGES.map(function (l) {
-      return '<button class="otw-opt" type="button" data-lang="' + l.code + '">' +
-        '<span>' + l.nativeName + '</span><span>' + l.name + '</span></button>';
-    }).join('');
+    menu.innerHTML =
+      '<input class="otw-search" type="text" placeholder="Search language…" />' +
+      '<div class="otw-list">' +
+      LANGUAGES.map(function (l) {
+        var search = (l.code + ' ' + l.name + ' ' + l.nativeName).toLowerCase();
+        return '<button class="otw-opt" type="button" data-lang="' + l.code + '" data-search="' + search + '">' +
+          '<span>' + l.nativeName + '</span><span>' + l.name + '</span></button>';
+      }).join('') +
+      '<div class="otw-empty">No languages found</div>' +
+      '</div>';
+
+    var searchInput = menu.querySelector('.otw-search');
+    var emptyRow = menu.querySelector('.otw-empty');
+    searchInput.addEventListener('input', function () {
+      var q = searchInput.value.trim().toLowerCase();
+      var anyVisible = false;
+      menu.querySelectorAll('.otw-opt').forEach(function (opt) {
+        var match = !q || opt.getAttribute('data-search').indexOf(q) !== -1;
+        opt.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
+      });
+      emptyRow.style.display = anyVisible ? 'none' : 'block';
+    });
 
     var ui = {
       setBusy: function (b) { btn.disabled = b; if (b) menu.classList.remove('open'); },
@@ -245,7 +267,17 @@
     };
 
     label.textContent = nativeName(currentLang);
-    btn.addEventListener('click', function () { if (!isTranslating) menu.classList.toggle('open'); });
+    btn.addEventListener('click', function () {
+      if (isTranslating) return;
+      var willOpen = !menu.classList.contains('open');
+      menu.classList.toggle('open');
+      if (willOpen) {
+        searchInput.value = '';
+        menu.querySelectorAll('.otw-opt').forEach(function (opt) { opt.style.display = ''; });
+        emptyRow.style.display = 'none';
+        searchInput.focus();
+      }
+    });
     menu.addEventListener('click', function (e) {
       var opt = e.target.closest('.otw-opt');
       if (opt) translateTo(opt.getAttribute('data-lang'), ui);
