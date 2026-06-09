@@ -71,12 +71,32 @@
   ];
   var RTL = ['ar', 'he', 'fa', 'ur'];
 
-  var langAttr = script.getAttribute('data-languages');
-  var LANGUAGES = langAttr
-    ? langAttr.split(',').map(function (c) { return c.trim(); }).map(function (code) {
-        return ALL_LANGUAGES.find(function (l) { return l.code === code; }) || { code: code, name: code, nativeName: code };
-      })
-    : ALL_LANGUAGES;
+  function parseList(attr) {
+    return attr
+      ? attr.split(',').map(function (c) { return c.trim(); }).filter(Boolean)
+      : [];
+  }
+
+  function computeLanguages(all, include, exclude, defaultLang) {
+    var base = include.length
+      ? all.filter(function (l) { return include.indexOf(l.code) !== -1; })
+      : all;
+    var filtered = base.filter(function (l) { return exclude.indexOf(l.code) === -1; });
+    var hasDefault = filtered.some(function (l) { return l.code === defaultLang; });
+    if (!hasDefault) {
+      var match = all.filter(function (l) { return l.code === defaultLang; });
+      var dl = match[0] || { code: defaultLang, name: defaultLang, nativeName: defaultLang };
+      return [dl].concat(filtered);
+    }
+    return filtered;
+  }
+
+  var LANGUAGES = computeLanguages(
+    ALL_LANGUAGES,
+    parseList(script.getAttribute('data-languages')),
+    parseList(script.getAttribute('data-exclude')),
+    CONFIG.defaultLang
+  );
 
   var currentLang = CONFIG.defaultLang;
   var textNodes = [];
