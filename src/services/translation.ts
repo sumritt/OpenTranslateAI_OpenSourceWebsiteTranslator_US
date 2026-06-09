@@ -49,6 +49,13 @@ export class TranslationService {
         }
 
         const data = await response.json();
+        // The proxy answers HTTP 200 with { degraded: true } and echoes the
+        // original texts when the model failed to produce a usable translation.
+        // Treat it as a failure so the untranslated passthrough is never cached
+        // as a translation, letting the caller retry (e.g. with a smaller batch).
+        if (data?.degraded === true) {
+          throw new Error('Translation degraded');
+        }
         const translations = data?.translations;
         if (!Array.isArray(translations) || translations.length !== texts.length) {
           throw new Error('Malformed translation response');
@@ -60,7 +67,10 @@ export class TranslationService {
         return translations;
       } catch (error) {
         lastError = error as Error;
+        // These are deterministic at temperature 0 — retrying the same payload
+        // would just fail again and waste calls. Surface immediately.
         if (lastError.message === 'Malformed translation response') break;
+        if (lastError.message === 'Translation degraded') break;
         if (attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
         }

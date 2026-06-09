@@ -67,4 +67,22 @@ describe('TranslationService.translateBatch', () => {
     const headers = (fetchMock as any).mock.calls[0][1].headers;
     expect(headers['X-Widget-Token']).toBe('secret');
   });
+
+  it('rejects a degraded response and does not cache it', async () => {
+    // The proxy returns HTTP 200 with { degraded: true } when the model failed
+    // to produce a usable translation. Treat it as a failure, not a result, so
+    // the untranslated text is never cached as if it were translated.
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ translations: ['Hello'], degraded: true }),
+    })) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', fetchMock);
+    const svc = new TranslationService({ proxyUrl: 'https://proxy.test' });
+
+    await expect(svc.translateBatch(['Hello'], 'th')).rejects.toThrow();
+    // Not cached: a second call hits the network again instead of returning the
+    // degraded passthrough. Exactly one fetch per call => degraded does not retry-storm.
+    await expect(svc.translateBatch(['Hello'], 'th')).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

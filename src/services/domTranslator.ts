@@ -88,7 +88,14 @@ export class DOMTranslator {
       return;
     }
 
-    if (targetLang === this.currentLang) {
+    // Short-circuit only when re-selecting a language we can show with no work:
+    // the untouched original, or a language fully cached from a clean run. A
+    // partial translation (some batches failed) is intentionally NOT cached, so
+    // re-selecting it falls through to a real retry instead of a silent no-op.
+    if (
+      targetLang === this.currentLang &&
+      (targetLang === this.originalLang || this.translationCache[targetLang] !== undefined)
+    ) {
       return;
     }
 
@@ -110,7 +117,10 @@ export class DOMTranslator {
         this.currentLang = targetLang;
         onProgress?.(100);
       } else {
-        const batchSize = 25;
+        // Smaller batches reduce per-request failure (the model has fewer items
+        // to keep aligned and less output to truncate), so fewer nodes fall back
+        // to their original text.
+        const batchSize = 10;
         const concurrency = 5;
 
         const chunks: { nodes: TextNodeData[]; start: number }[] = [];
@@ -121,6 +131,7 @@ export class DOMTranslator {
         const allTranslations: string[] = new Array(this.textNodes.length);
         let completed = 0;
         let nextChunk = 0;
+        let anyFailed = false;
 
         const worker = async (): Promise<void> => {
           while (true) {
@@ -129,11 +140,12 @@ export class DOMTranslator {
             const chunk = chunks[idx];
             const texts = chunk.nodes.map((nodeData) => nodeData.originalText);
 
-            const translated = await this.translationService.translateBatch(texts, targetLang);
+            const { out, ok } = await this.translateChunk(texts, targetLang);
+            if (!ok) anyFailed = true;
 
             chunk.nodes.forEach((nodeData, j) => {
-              nodeData.node.textContent = translated[j];
-              allTranslations[chunk.start + j] = translated[j];
+              nodeData.node.textContent = out[j];
+              allTranslations[chunk.start + j] = out[j];
             });
 
             completed++;
@@ -147,11 +159,36 @@ export class DOMTranslator {
         );
         await Promise.all(pool);
 
-        this.translationCache[targetLang] = allTranslations;
+        // Only cache a clean, fully-translated run. Caching a partial result
+        // would freeze the untranslated nodes in place on every later switch.
+        if (!anyFailed) {
+          this.translationCache[targetLang] = allTranslations;
+        }
         this.currentLang = targetLang;
       }
     } finally {
       this.isTranslating = false;
+    }
+  }
+
+  // Translate one batch, bisecting on failure so a single bad item cannot block
+  // its neighbours. Returns the (possibly partial) texts plus whether every item
+  // translated. A leaf that still fails keeps its original text and reports ok=false.
+  private async translateChunk(
+    texts: string[],
+    targetLang: string,
+  ): Promise<{ out: string[]; ok: boolean }> {
+    try {
+      const out = await this.translationService.translateBatch(texts, targetLang);
+      return { out, ok: true };
+    } catch {
+      if (texts.length <= 1) {
+        return { out: texts.slice(), ok: false };
+      }
+      const mid = Math.ceil(texts.length / 2);
+      const left = await this.translateChunk(texts.slice(0, mid), targetLang);
+      const right = await this.translateChunk(texts.slice(mid), targetLang);
+      return { out: [...left.out, ...right.out], ok: left.ok && right.ok };
     }
   }
 
