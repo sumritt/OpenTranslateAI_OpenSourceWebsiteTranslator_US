@@ -1,26 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Globe, Loader2, Check, AlertCircle } from 'lucide-react';
 import { TranslationService } from '../services/translation';
 import { DOMTranslator } from '../services/domTranslator';
-
-interface Language {
-  code: string;
-  name: string;
-  nativeName: string;
-}
-
-const LANGUAGES: Language[] = [
-  { code: 'zh', name: 'Chinese', nativeName: '中文' },
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español' },
-  { code: 'fr', name: 'French', nativeName: 'Français' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch' },
-  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
-  { code: 'ko', name: 'Korean', nativeName: '한국어' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
-];
+import { LANGUAGES, computeLanguages } from '../languages';
 
 interface TranslationWidgetProps {
   defaultLang?: string;
@@ -30,6 +12,8 @@ interface TranslationWidgetProps {
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   onLanguageChange?: (lang: string) => void;
   localLanguages?: string[];
+  includeLanguages?: string[];
+  excludeLanguages?: string[];
 }
 
 export function TranslationWidget({
@@ -40,6 +24,8 @@ export function TranslationWidget({
   position = 'top-right',
   onLanguageChange,
   localLanguages = [],
+  includeLanguages,
+  excludeLanguages,
 }: TranslationWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState(defaultLang);
@@ -49,6 +35,17 @@ export function TranslationWidget({
   const [domTranslator, setDomTranslator] = useState<DOMTranslator | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [cachedLanguages, setCachedLanguages] = useState<string[]>([]);
+
+  const availableLanguages = useMemo(
+    () =>
+      computeLanguages({
+        all: LANGUAGES,
+        include: includeLanguages,
+        exclude: excludeLanguages,
+        defaultLang,
+      }),
+    [includeLanguages, excludeLanguages, defaultLang],
+  );
 
   useEffect(() => {
     const initTranslator = async () => {
@@ -209,7 +206,7 @@ export function TranslationWidget({
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 w-[320px] max-w-[calc(100vw-2rem)]">
-              {LANGUAGES.map((lang) => {
+              {availableLanguages.map((lang) => {
                 const isLocal = localLanguages.includes(lang.code);
                 const isCached = cachedLanguages.includes(lang.code);
                 const showInstantBadge = isLocal || isCached;
