@@ -25,3 +25,6 @@ dist-ssr
 # Supabase
 supabase/.temp
 supabase/.branches
+
+# Test output
+vitest_out.txt
