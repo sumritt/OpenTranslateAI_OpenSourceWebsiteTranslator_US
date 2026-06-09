@@ -16,6 +16,22 @@ function rootWith(texts: string[]): HTMLElement {
   return root;
 }
 
+function appendP(root: HTMLElement, text: string): HTMLElement {
+  const p = document.createElement('p');
+  p.textContent = text;
+  root.appendChild(p);
+  return p;
+}
+
+// MutationObserver delivers on a microtask; the async translate that follows
+// resolves on later ticks. Flush several rounds to let it settle.
+async function flushObserver(): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+  }
+}
+
 describe('DOMTranslator', () => {
   it('translates every text node via translateBatch and writes results back', async () => {
     const service = makeService(async (texts) => texts.map((t) => `T:${t}`));
@@ -144,5 +160,78 @@ describe('DOMTranslator', () => {
     await dt.translateTo('th');
     expect(ps()[1].textContent).toBe('T:BAD');
     expect(dt.getCachedLanguages()).toContain('th'); // now fully cached
+  });
+
+  it('translates nodes added after initialize to the current language (ingest)', async () => {
+    const service = makeService(async (texts) => texts.map((t) => `T:${t}`));
+    const root = rootWith(['Hello']);
+    const dt = new DOMTranslator(service as never, 'en');
+    await dt.initialize(root);
+    await dt.translateTo('th');
+
+    const p = appendP(root, 'Later'); // e.g. an accordion answer mounting
+    await dt.ingestNodes([p]);
+
+    expect(p.textContent).toBe('T:Later');
+    dt.disconnect();
+  });
+
+  it('leaves added nodes untouched while showing the original language', async () => {
+    const service = makeService(async (texts) => texts.map((t) => `T:${t}`));
+    const root = rootWith(['Hello']);
+    const dt = new DOMTranslator(service as never, 'en');
+    await dt.initialize(root); // currentLang === original ('en')
+
+    const p = appendP(root, 'Later');
+    await dt.ingestNodes([p]);
+
+    expect(p.textContent).toBe('Later');
+    expect(service.translateBatch).not.toHaveBeenCalled();
+    dt.disconnect();
+  });
+
+  it('auto-translates dynamically mounted content via the MutationObserver', async () => {
+    const service = makeService(async (texts) => texts.map((t) => `T:${t}`));
+    const root = rootWith(['Hello']);
+    const dt = new DOMTranslator(service as never, 'en');
+    await dt.initialize(root);
+    await dt.translateTo('th');
+
+    const p = appendP(root, 'Later'); // no manual ingest — the observer must react
+    await flushObserver();
+
+    expect(p.textContent).toBe('T:Later');
+    dt.disconnect();
+  });
+
+  it('keeps the original text of added nodes for restore', async () => {
+    const service = makeService(async (texts) => texts.map((t) => `T:${t}`));
+    const root = rootWith(['Hello']);
+    const dt = new DOMTranslator(service as never, 'en');
+    await dt.initialize(root);
+    await dt.translateTo('th');
+    const p = appendP(root, 'Later');
+    await dt.ingestNodes([p]);
+
+    await dt.translateTo('en'); // restore
+
+    expect(p.textContent).toBe('Later');
+    dt.disconnect();
+  });
+
+  it('re-translates a previously cached language after nodes were added', async () => {
+    const service = makeService(async (texts) => texts.map((t) => `T:${t}`));
+    const root = rootWith(['A']);
+    const dt = new DOMTranslator(service as never, 'en');
+    await dt.initialize(root);
+    await dt.translateTo('th'); // caches th, aligned to 1 node
+    await dt.translateTo('en'); // back to original
+
+    const p = appendP(root, 'B');
+    await dt.ingestNodes([p]); // on original => not translated; th cache now stale
+
+    await dt.translateTo('th'); // stale cache must not be reused
+    expect(p.textContent).toBe('T:B');
+    dt.disconnect();
   });
 });

@@ -58,6 +58,8 @@ export function TranslationWidget({
   );
 
   useEffect(() => {
+    let translatorRef: DOMTranslator | null = null;
+
     const initTranslator = async () => {
       try {
         if (!proxyUrl) {
@@ -66,6 +68,7 @@ export function TranslationWidget({
         }
         const translationService = new TranslationService({ proxyUrl, token });
         const translator = new DOMTranslator(translationService, defaultLang);
+        translatorRef = translator;
 
         const targetElement = document.getElementById(targetElementId);
         if (targetElement) {
@@ -85,6 +88,10 @@ export function TranslationWidget({
     };
 
     initTranslator();
+
+    // Stop the MutationObserver on unmount / dependency change so it does not
+    // keep reacting to a stale target element.
+    return () => translatorRef?.disconnect();
   }, [proxyUrl, token, defaultLang, targetElementId]);
 
   const handleLanguageChange = async (langCode: string) => {

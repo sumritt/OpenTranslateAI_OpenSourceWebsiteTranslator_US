@@ -18,6 +18,7 @@ export class DOMTranslator {
   private currentLang: string;
   private isTranslating = false;
   private translationCache: TranslationCache = {};
+  private observer: MutationObserver | null = null;
 
   constructor(translationService: BatchTranslator, originalLang: string) {
     this.translationService = translationService;
@@ -41,7 +42,15 @@ export class DOMTranslator {
     return false;
   }
 
-  private extractTextNodes(root: Node): void {
+  // Visit every non-empty text node under `root`, skipping disallowed subtrees.
+  // Handles `root` being a text node itself (a bare text node added at runtime).
+  private walkTextNodes(root: Node, visit: (textNode: Text) => void): void {
+    if (root.nodeType === Node.TEXT_NODE) {
+      if ((root.textContent || '').trim().length > 0) visit(root as Text);
+      return;
+    }
+    if (root.nodeType === Node.ELEMENT_NODE && this.shouldSkipNode(root)) return;
+
     const walker = document.createTreeWalker(
       root,
       NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
@@ -50,14 +59,11 @@ export class DOMTranslator {
           if (node.nodeType === Node.ELEMENT_NODE && this.shouldSkipNode(node)) {
             return NodeFilter.FILTER_REJECT;
           }
-
           if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent?.trim() || '';
-            if (text.length > 0) {
-              return NodeFilter.FILTER_ACCEPT;
-            }
+            return (node.textContent || '').trim().length > 0
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_SKIP;
           }
-
           return NodeFilter.FILTER_SKIP;
         },
       }
@@ -65,21 +71,83 @@ export class DOMTranslator {
 
     let currentNode: Node | null;
     while ((currentNode = walker.nextNode())) {
-      if (currentNode.nodeType === Node.TEXT_NODE) {
-        const text = currentNode.textContent || '';
-        if (text.trim().length > 0) {
-          this.textNodes.push({
-            node: currentNode as Text,
-            originalText: text,
-          });
-        }
-      }
+      if (currentNode.nodeType === Node.TEXT_NODE) visit(currentNode as Text);
     }
+  }
+
+  private extractTextNodes(root: Node): void {
+    this.walkTextNodes(root, (textNode) => {
+      this.textNodes.push({ node: textNode, originalText: textNode.textContent || '' });
+    });
   }
 
   async initialize(root: HTMLElement): Promise<void> {
     this.textNodes = [];
     this.extractTextNodes(root);
+    this.observeMutations(root);
+  }
+
+  // Watch for content mounted after init (accordions, modals, tabs, lazy
+  // sections) and translate it to whatever language is currently shown. Without
+  // this, the one-shot snapshot in initialize() leaves dynamic content
+  // permanently in the source language.
+  private observeMutations(root: HTMLElement): void {
+    if (typeof MutationObserver === 'undefined') return;
+    this.observer?.disconnect();
+    this.observer = new MutationObserver((records) => {
+      const added: Node[] = [];
+      for (const record of records) {
+        record.addedNodes.forEach((node) => added.push(node));
+      }
+      if (added.length) void this.ingestNodes(added);
+    });
+    // childList + subtree only — NOT characterData, so our own textContent
+    // writes during translation never feed back into the observer.
+    this.observer.observe(root, { childList: true, subtree: true });
+  }
+
+  disconnect(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+  }
+
+  // Capture text nodes from freshly-added subtrees and, when a translated
+  // language is showing, translate them in place. Public so callers (and tests)
+  // can drive it directly; the observer calls the same path.
+  async ingestNodes(roots: Node[]): Promise<void> {
+    const fresh: TextNodeData[] = [];
+    for (const root of roots) {
+      this.walkTextNodes(root, (textNode) => {
+        fresh.push({ node: textNode, originalText: textNode.textContent || '' });
+      });
+    }
+    if (fresh.length === 0) return;
+
+    const priorCount = this.textNodes.length;
+    this.textNodes.push(...fresh);
+
+    // Original language is the untouched DOM — new nodes already show it.
+    if (this.currentLang === this.originalLang) return;
+
+    const lang = this.currentLang;
+    const texts = fresh.map((nodeData) => nodeData.originalText);
+    const batchSize = 10;
+    const out: string[] = [];
+    for (let i = 0; i < texts.length; i += batchSize) {
+      const { out: chunk } = await this.translateChunk(texts.slice(i, i + batchSize), lang);
+      out.push(...chunk);
+    }
+    fresh.forEach((nodeData, j) => {
+      nodeData.node.textContent = out[j];
+    });
+
+    // Keep the index-aligned cache consistent: extend it if it still lines up,
+    // otherwise drop it so the next switch to this language re-translates cleanly.
+    const cache = this.translationCache[lang];
+    if (cache) {
+      if (cache.length === priorCount) cache.push(...out);
+      else delete this.translationCache[lang];
+    }
   }
 
   async translateTo(targetLang: string, onProgress?: (progress: number) => void): Promise<void> {
@@ -109,8 +177,12 @@ export class DOMTranslator {
         });
         this.currentLang = this.originalLang;
         onProgress?.(100);
-      } else if (this.translationCache[targetLang]) {
-        // Use cached translation
+      } else if (
+        this.translationCache[targetLang] &&
+        this.translationCache[targetLang].length === this.textNodes.length
+      ) {
+        // Use cached translation. The length guard rejects a cache that went
+        // stale after nodes were added at runtime, forcing a clean re-translate.
         this.textNodes.forEach((nodeData, index) => {
           nodeData.node.textContent = this.translationCache[targetLang][index];
         });
