@@ -1,17 +1,14 @@
-import { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { TranslationWidget } from './components/TranslationWidget';
 import { TranslationDebug } from './components/TranslationDebug';
 import { DemoContentEnglish } from './components/DemoContentEnglish';
 import { CookieConsent } from './components/CookieConsent';
-import { WaitlistPopup } from './components/WaitlistPopup';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { TermsOfService } from './components/TermsOfService';
 import { CookiePolicy } from './components/CookiePolicy';
 import { NotFound } from './components/NotFound';
 
 function App() {
-  const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const proxyUrl = (import.meta.env.VITE_TRANSLATE_PROXY_URL as string | undefined) ?? '';
   const proxyToken = import.meta.env.VITE_TRANSLATE_TOKEN as string | undefined;
 
@@ -28,9 +25,8 @@ function App() {
               position="top-right"
             />
             {import.meta.env.DEV && <TranslationDebug proxyUrl={proxyUrl} />}
-            <DemoContentEnglish onOpenWaitlist={() => setIsWaitlistOpen(true)} />
+            <DemoContentEnglish />
             <CookieConsent />
-            <WaitlistPopup isOpen={isWaitlistOpen} onClose={() => setIsWaitlistOpen(false)} />
           </>
         } />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />

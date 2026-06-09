@@ -168,9 +168,7 @@ Configure the widget to use your own translation service:
 - **TranslationWidget** (`src/components/TranslationWidget.tsx`): Main UI widget
 - **CookieConsent** (`src/components/CookieConsent.tsx`): GDPR-compliant cookie banner
 - **NotFound** (`src/components/NotFound.tsx`): Custom 404 error page
-- **DemoContent** (`src/components/DemoContent.tsx`): Chinese demo page (local language)
-- **DemoContentEnglish** (`src/components/DemoContentEnglish.tsx`): English demo page (local language)
-- **DemoContentSpanish** (`src/components/DemoContentSpanish.tsx`): Spanish demo page (local language)
+- **DemoContentEnglish** (`src/components/DemoContentEnglish.tsx`): English demo page (all languages route through the AI translator)
 
 ## SEO Features
 
@@ -324,9 +322,7 @@ src/
 ├── components/
 │   ├── AIModelIcons.tsx       # AI model icons
 │   ├── CookieConsent.tsx      # GDPR cookie banner
-│   ├── DemoContent.tsx        # Chinese demo page (local)
-│   ├── DemoContentEnglish.tsx # English demo page (local)
-│   ├── DemoContentSpanish.tsx # Spanish demo page (local)
+│   ├── DemoContentEnglish.tsx # English demo page
 │   ├── NotFound.tsx           # 404 error page
 │   ├── TranslationDebug.tsx   # Debug component
 │   └── TranslationWidget.tsx  # Main widget
