@@ -126,6 +126,69 @@
     }
   }
 
+  // Collect translatable text nodes from a subtree added at runtime, applying
+  // the same skip rules as extractTextNodes. Handles `node` being a bare text node.
+  function collectNewTextNodes(node, acc) {
+    if (node.nodeType === 3) {
+      var parent = node.parentElement;
+      if (!parent) return;
+      var tag = parent.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE' || parent.closest('[data-no-translate]')) return;
+      if (node.textContent.trim().length > 0) acc.push({ node: node, originalText: node.textContent });
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE' || node.closest('[data-no-translate]')) return;
+    var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (n) {
+        var p = n.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        var t = p.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE' || p.closest('[data-no-translate]')) return NodeFilter.FILTER_REJECT;
+        return n.textContent.trim().length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      },
+    });
+    var tn;
+    while ((tn = walker.nextNode())) acc.push({ node: tn, originalText: tn.textContent });
+  }
+
+  // Translate content mounted after init (accordions, modals, tabs, lazy
+  // sections) into whatever language is currently shown. Without this, the
+  // one-shot snapshot in extractTextNodes() leaves dynamic content untranslated.
+  async function ingestNodes(added) {
+    var fresh = [];
+    for (var i = 0; i < added.length; i++) collectNewTextNodes(added[i], fresh);
+    if (fresh.length === 0) return;
+    for (var k = 0; k < fresh.length; k++) textNodes.push(fresh[k]);
+    if (currentLang === CONFIG.defaultLang) return; // original is showing
+    var lang = currentLang;
+    for (var j = 0; j < fresh.length; j += CONFIG.batchSize) {
+      var slice = fresh.slice(j, j + CONFIG.batchSize);
+      var texts = slice.map(function (n) { return n.originalText; });
+      try {
+        var out = await translateBatch(texts, lang);
+        slice.forEach(function (n, idx) { n.node.textContent = out[idx]; });
+      } catch (e) {
+        console.error('[widget.js] translating new content failed', e);
+      }
+    }
+  }
+
+  function observeMutations() {
+    if (typeof MutationObserver === 'undefined') return;
+    // childList + subtree only (not characterData) so our own textContent writes
+    // during translation never feed back into the observer.
+    var observer = new MutationObserver(function (records) {
+      var added = [];
+      for (var i = 0; i < records.length; i++) {
+        var nodes = records[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) added.push(nodes[j]);
+      }
+      if (added.length) ingestNodes(added);
+    });
+    observer.observe(getRoot(), { childList: true, subtree: true });
+  }
+
   function cacheKey(text, target) {
     return target + '::' + text.trim();
   }
@@ -299,6 +362,7 @@
       return;
     }
     extractTextNodes();
+    observeMutations();
     buildUI();
   }
 
