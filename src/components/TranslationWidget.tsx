@@ -1,45 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Globe, Loader2, Check, AlertCircle } from 'lucide-react';
 import { TranslationService } from '../services/translation';
 import { DOMTranslator } from '../services/domTranslator';
-
-interface Language {
-  code: string;
-  name: string;
-  nativeName: string;
-}
-
-const LANGUAGES: Language[] = [
-  { code: 'zh', name: 'Chinese', nativeName: '中文' },
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español' },
-  { code: 'fr', name: 'French', nativeName: 'Français' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch' },
-  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
-  { code: 'ko', name: 'Korean', nativeName: '한국어' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
-];
+import { LANGUAGES, computeLanguages, matchLanguage } from '../languages';
 
 interface TranslationWidgetProps {
   defaultLang?: string;
-  apiUrl?: string;
-  apiKey?: string;
+  proxyUrl: string;
+  token?: string;
   targetElementId?: string;
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   onLanguageChange?: (lang: string) => void;
   localLanguages?: string[];
+  includeLanguages?: string[];
+  excludeLanguages?: string[];
 }
 
 export function TranslationWidget({
   defaultLang = 'zh',
-  apiUrl,
-  apiKey,
+  proxyUrl,
+  token,
   targetElementId = 'translatable-content',
   position = 'top-right',
   onLanguageChange,
   localLanguages = [],
+  includeLanguages,
+  excludeLanguages,
 }: TranslationWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState(defaultLang);
@@ -50,11 +36,39 @@ export function TranslationWidget({
   const [isInitialized, setIsInitialized] = useState(false);
   const [cachedLanguages, setCachedLanguages] = useState<string[]>([]);
 
+  const availableLanguages = useMemo(
+    () =>
+      computeLanguages({
+        all: LANGUAGES,
+        include: includeLanguages,
+        exclude: excludeLanguages,
+        defaultLang,
+      }),
+    [includeLanguages, excludeLanguages, defaultLang],
+  );
+
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
+    if (!isOpen) setSearchQuery('');
+  }, [isOpen]);
+
+  const visibleLanguages = availableLanguages.filter((lang) =>
+    matchLanguage(lang, searchQuery),
+  );
+
+  useEffect(() => {
+    let translatorRef: DOMTranslator | null = null;
+
     const initTranslator = async () => {
       try {
-        const translationService = new TranslationService({ apiUrl, apiKey });
+        if (!proxyUrl) {
+          setError('Translation proxy URL is not configured (set VITE_TRANSLATE_PROXY_URL)');
+          return;
+        }
+        const translationService = new TranslationService({ proxyUrl, token });
         const translator = new DOMTranslator(translationService, defaultLang);
+        translatorRef = translator;
 
         const targetElement = document.getElementById(targetElementId);
         if (targetElement) {
@@ -74,7 +88,11 @@ export function TranslationWidget({
     };
 
     initTranslator();
-  }, [apiUrl, apiKey, defaultLang, targetElementId]);
+
+    // Stop the MutationObserver on unmount / dependency change so it does not
+    // keep reacting to a stale target element.
+    return () => translatorRef?.disconnect();
+  }, [proxyUrl, token, defaultLang, targetElementId]);
 
   const handleLanguageChange = async (langCode: string) => {
     if (!domTranslator || isTranslating || !isInitialized) return;
@@ -84,7 +102,12 @@ export function TranslationWidget({
 
     const isLocalLanguage = localLanguages.includes(langCode);
 
-    if (isLocalLanguage) {
+    // The original language is the untouched DOM, not a pre-written "local" swap.
+    // An AI translation mutates the DOM text in place; selecting the original
+    // language again must route through the translator to restore that text.
+    // Taking the local-swap path for it is a no-op when the original component
+    // is already mounted, which would leave the page stuck in the AI language.
+    if (isLocalLanguage && langCode !== domTranslator.getOriginalLang()) {
       setCurrentLang(langCode);
       onLanguageChange?.(langCode);
       return;
@@ -128,7 +151,7 @@ export function TranslationWidget({
       const errorMessage = err instanceof Error ? err.message : 'Translation failed';
 
       if (errorMessage.includes('CORS') || errorMessage.includes('network')) {
-        setError('Connection error. Try self-hosting LibreTranslate or check your network.');
+        setError('Connection error. Check your proxy URL and network.');
       } else if (errorMessage.includes('rate limit')) {
         setError('Rate limit reached. Please wait and try again.');
       } else {
@@ -194,13 +217,16 @@ export function TranslationWidget({
           <div className={`absolute top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-[100] ${
             position.includes('right') ? 'right-0' : 'left-0'
           }`}>
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Select Language
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 w-[320px] max-w-[calc(100vw-2rem)]">
-              {LANGUAGES.map((lang) => {
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search language…"
+              autoFocus
+              className="w-full mb-3 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="grid grid-cols-2 gap-2 w-[320px] max-w-[calc(100vw-2rem)] max-h-72 overflow-y-auto">
+              {visibleLanguages.map((lang) => {
                 const isLocal = localLanguages.includes(lang.code);
                 const isCached = cachedLanguages.includes(lang.code);
                 const showInstantBadge = isLocal || isCached;
@@ -242,6 +268,9 @@ export function TranslationWidget({
                   </button>
                 );
               })}
+              {visibleLanguages.length === 0 && (
+                <p className="col-span-2 text-xs text-gray-400 py-2 px-1">No languages found</p>
+              )}
             </div>
           </div>
         )}

@@ -1,0 +1,11 @@
+# Supabase project config. Only the settings this repo needs are set here;
+# the CLI fills defaults for everything else.
+project_id = "OpenTranslateAI_OpenSourceWebsiteTranslator_US"
+
+[functions.translate]
+# Public translation proxy. Protection is the in-function origin allowlist
+# (ALLOWED_ORIGINS) plus the optional WIDGET_TOKEN — NOT a Supabase JWT.
+# The browser widget (public/widget.js) and the React client do not send an
+# Authorization header, so the gateway JWT check must be disabled for this
+# function or every public call returns 401.
+verify_jwt = false

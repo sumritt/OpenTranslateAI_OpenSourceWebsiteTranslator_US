@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { ArrowRight, Shield, Zap, Users, FileText, Check, Github, Circle, Info, Sparkles, Target, Gift, Crown, Download, Linkedin } from 'lucide-react';
+import { ArrowRight, Shield, Zap, Users, FileText, Check, Github, Circle, Info, Target, Gift, Crown, Download, Linkedin } from 'lucide-react';
 import { OllamaIcon, OpenAIIcon, ClaudeIcon, GrokIcon, QwenIcon } from './AIModelIcons';
 import { AnimatedButton } from './AnimatedButton';
 
-interface DemoContentEnglishProps {
-  onOpenWaitlist: () => void;
-}
-
-export function DemoContentEnglish({ onOpenWaitlist }: DemoContentEnglishProps) {
+export function DemoContentEnglish() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
@@ -77,13 +73,6 @@ export function DemoContentEnglish({ onOpenWaitlist }: DemoContentEnglishProps) 
 
               <div className="animate-fade-up delay-500 flex flex-wrap gap-4 items-center">
                 <AnimatedButton text="View on GitHub" href="https://github.com/aceman23/OpenTranslateAI_OpenSourceWebsiteTranslator_US" />
-                <button
-                  onClick={onOpenWaitlist}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-full text-base hover:from-blue-600 hover:to-blue-700 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300 font-montserrat font-medium flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Join Waitlist
-                </button>
               </div>
             </div>
 
@@ -366,9 +355,6 @@ export function DemoContentEnglish({ onOpenWaitlist }: DemoContentEnglishProps) 
                   </div>
                 </div>
 
-                <div className="mt-12 flex gap-4">
-                  <AnimatedButton text="Join Waitlist" href="#" />
-                </div>
               </div>
 
               <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-3xl p-8 font-mono text-sm text-gray-300">

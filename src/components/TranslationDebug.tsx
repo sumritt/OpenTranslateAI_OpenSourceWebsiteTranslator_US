@@ -3,11 +3,10 @@ import { Bug, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { TranslationService } from '../services/translation';
 
 interface TranslationDebugProps {
-  apiUrl?: string;
-  apiKey?: string;
+  proxyUrl: string;
 }
 
-export function TranslationDebug({ apiUrl, apiKey }: TranslationDebugProps) {
+export function TranslationDebug({ proxyUrl }: TranslationDebugProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -21,22 +20,13 @@ export function TranslationDebug({ apiUrl, apiKey }: TranslationDebugProps) {
     setTestResult(null);
 
     try {
-      const service = new TranslationService({ apiUrl, apiKey });
-      const result = await service.testConnection();
-
-      if (result.success) {
-        setTestResult({
-          success: true,
-          message: 'Connection successful!',
-          details: 'Translation API is working correctly.',
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: 'Connection failed',
-          details: result.error || 'Unknown error',
-        });
-      }
+      const service = new TranslationService({ proxyUrl });
+      await service.translateBatch(['Hello'], 'es');
+      setTestResult({
+        success: true,
+        message: 'Connection successful!',
+        details: 'Translation proxy is working correctly.',
+      });
     } catch (error) {
       setTestResult({
         success: false,
@@ -82,7 +72,7 @@ export function TranslationDebug({ apiUrl, apiKey }: TranslationDebugProps) {
             <strong>API URL:</strong>
           </p>
           <p className="bg-gray-50 p-2 rounded break-all font-mono">
-            {apiUrl || 'https://libretranslate.com/translate'}
+            {proxyUrl}
           </p>
         </div>
 
@@ -143,9 +133,9 @@ export function TranslationDebug({ apiUrl, apiKey }: TranslationDebugProps) {
           </p>
           <ul className="list-disc list-inside space-y-1">
             <li>Check network connection</li>
-            <li>Verify API URL is correct</li>
+            <li>Verify the proxy URL is correct</li>
             <li>Check for CORS restrictions</li>
-            <li>Consider self-hosting LibreTranslate</li>
+            <li>Verify the proxy is deployed and OPENROUTER_API_KEY is set</li>
           </ul>
         </div>
       </div>

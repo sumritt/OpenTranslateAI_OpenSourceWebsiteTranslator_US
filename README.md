@@ -1,63 +1,85 @@
-# Open-Source AI Website Translator Widget 2026 | Google Translate Alternative
+# Open-Source AI Website Translator Widget | Google Translate Alternative
 
-A production-ready, SEO-optimized AI-powered translation widget for modern web applications. The best **Google Translate alternative** for developers seeking privacy, customization, and control. Free open-source website translator widget 2026 with multi-AI model support, built with React and TypeScript.
+A production-ready, SEO-friendly AI translation widget for modern websites. Translation is powered by an **LLM through [OpenRouter](https://openrouter.ai/)**, called via a small **Supabase Edge Function proxy** so your API key never ships to the browser. Built with React + TypeScript, and also available as a single drop-in `<script>` embed.
 
-🔗 **[View on GitHub](https://github.com/aceman23/OpenTranslateAI_OpenSourceWebsiteTranslator_US)** | 🌐 **[Live Demo](https://opentranslateai.com)**
+> This repository is a fork that re-platforms the original LibreTranslate-based template onto OpenRouter + a serverless proxy. See [Acknowledgements](#acknowledgements).
 
-## Why Choose This Over Google Translate Widget?
+🔗 **[Original project (aceman23)](https://github.com/aceman23/OpenTranslateAI_OpenSourceWebsiteTranslator_US)**
 
-✅ **100% Free & Open Source** - No API costs, no hidden fees
+## Why this widget?
 
-✅ **Complete Privacy** - Self-hosted option, no data sent to third parties
+✅ **Bring your own model** — point `OPENROUTER_MODEL` at any OpenRouter model (e.g. `google/gemini-2.5-flash`, GPT-4o, Claude, DeepSeek, Qwen)
 
-✅ **Full Customization** - Modify code to fit your exact needs
+✅ **Key stays server-side** — the OpenRouter key lives only in the Supabase proxy's secrets, never in the client bundle
 
-✅ **No Branding** - Your website, your way (unlike Google Translate widget)
+✅ **Embed anywhere** — a standalone `public/widget.js` works on any site via one `<script>` tag, no build step
 
-✅ **AI-Powered** - Support for multiple AI models (DeepSeek, GPT-4o, Claude, Qwen)
+✅ **~50 languages** — curated set with native names, type-to-search, and per-site allowlist / blocklist
 
-✅ **Better SEO** - Pre-translated content for search engines
+✅ **Works on dynamic pages** — a `MutationObserver` translates content mounted after load (accordions, modals, tabs, lazy sections)
 
-✅ **GDPR Compliant** - Built-in cookie consent and privacy controls
-
+✅ **Full control** — open source, self-hosted proxy, origin allowlist + optional shared token
 
 ## Features
 
-### Core Translation Features (2026 AI-Powered)
-- **Smart DOM Translation**: Preserves HTML structure, styles, and interactive elements while translating
-- **Multi-Language Support**: 10+ languages including Chinese (中文), English, Spanish (Español), French, German, Japanese (日本語), Korean, Arabic, Hindi, and Portuguese
-- **AI Model Integration**: Support for GPT-4o, Claude, DeepSeek, Qwen, Gemini, and more (Pro version coming soon)
-- **Local Language Components**: Pre-translated Chinese, English, and Spanish versions for instant switching without API calls
-- **Smart Caching System**: Lightning-fast language switching with zero latency once cached
-- **Batch Processing**: Optimized translation with real-time progress tracking
-- **Rate Limit Protection**: Local languages avoid API rate limits entirely
-- **Privacy-Focused**: Self-hosted option using LibreTranslate for complete data privacy and GDPR compliance
+### Translation
+- **Smart DOM translation**: walks text nodes with `TreeWalker` and updates them in place, preserving HTML structure, styles, and interactive elements
+- **OpenRouter LLM backend**: any chat model via a single configurable env var
+- **~50 languages**: native names + English names, type-to-search in the dropdown; restrict with `includeLanguages` / `excludeLanguages` (React) or `data-languages` / `data-exclude` (widget.js)
+- **Dynamic content**: newly mounted nodes are auto-translated to the active language via a `MutationObserver`
+- **Smart caching**: per-text and per-language caches make switching back to a translated language instant
+- **Batched + concurrent**: text is chunked and translated through a bounded worker pool, with a progress bar
+- **Resilient**: a failed batch is bisected so one bad item can't block its neighbours; failed (degraded) responses are never cached
 
-### Production-Ready Features
-- **SEO Optimized**: Comprehensive meta tags, Open Graph, Twitter Cards, and structured data (JSON-LD)
-- **Fully Accessible**: WCAG compliant with ARIA labels, keyboard navigation, and screen reader support
-- **GDPR Compliant**: Cookie consent banner with accept/decline options
-- **Mobile Responsive**: Seamless experience across all devices and screen sizes
-- **Performance Optimized**: DNS prefetch, preconnect hints, and optimized loading
-- **Custom 404 Page**: Professional error page with navigation options
-- **Legal Compliance**: Privacy Policy, Terms of Service, and Cookie Policy links
+### Embedding
+- **React component**: `<TranslationWidget />` for React/Vite apps
+- **Standalone script**: `public/widget.js` — a self-contained IIFE that reads config from its own `data-*` attributes, injects its own UI, and calls the proxy
 
-### Developer Experience
-- **Easy Integration**: Simple React component that works out of the box
-- **TypeScript Support**: Full type safety and IntelliSense
-- **Customizable**: Flexible positioning and styling options
-- **Well Documented**: Comprehensive documentation and examples
+### Production-ready
+- SEO meta tags, Open Graph, Twitter Cards, and JSON-LD structured data
+- Accessible (ARIA, keyboard navigation, screen-reader friendly)
+- GDPR cookie consent banner; Privacy Policy / Terms / Cookie Policy pages
+- Mobile responsive; custom 404 page
+
+## How it works
+
+```
+Browser (React widget or widget.js)
+  → POST { texts: string[], target } to the Supabase Edge Function (translate)
+      → proxy validates origin + optional X-Widget-Token, builds the prompt,
+        calls OpenRouter with OPENROUTER_API_KEY (server-side only)
+      → returns a JSON array of translations
+  → widget writes each translation back onto its text node
+```
+
+The OpenRouter key is read from the proxy's environment and is never exposed to the client. The browser only knows the proxy URL (and an optional shared widget token).
 
 ## Quick Start
 
-### Installation
+### 1. Install & run the demo
 
 ```bash
 npm install
 npm run dev
 ```
 
-### Basic Usage
+### 2. Deploy the translate proxy (Supabase Edge Function)
+
+The proxy lives in `supabase/functions/translate`. Set its secrets and deploy:
+
+```bash
+supabase secrets set OPENROUTER_API_KEY=sk-or-...
+supabase secrets set OPENROUTER_MODEL=google/gemini-2.5-flash
+supabase secrets set ALLOWED_ORIGINS=https://your-site.com,http://localhost:5173
+# optional shared token; if set, clients must send the same value
+supabase secrets set WIDGET_TOKEN=some-shared-secret
+
+supabase functions deploy translate
+```
+
+`supabase/config.toml` sets `verify_jwt = false` for this function — it is intentionally public and protected by the origin allowlist + optional `WIDGET_TOKEN`, not by a Supabase JWT.
+
+### 3a. Use the React widget
 
 ```tsx
 import { TranslationWidget } from './components/TranslationWidget';
@@ -66,344 +88,174 @@ function App() {
   return (
     <>
       <TranslationWidget
-        defaultLang="zh"
+        proxyUrl={import.meta.env.VITE_TRANSLATE_PROXY_URL}
+        token={import.meta.env.VITE_TRANSLATE_TOKEN}
+        defaultLang="en"
         targetElementId="content"
         position="top-right"
       />
-      <div id="content">
-        {/* Your translatable content */}
-      </div>
+      <div id="content">{/* your translatable content */}</div>
     </>
   );
 }
 ```
 
-### Configuration Options
+### 3b. Or embed `widget.js` on any site
+
+```html
+<div id="content"><!-- your content --></div>
+
+<script
+  src="https://your-cdn.com/widget.js"
+  data-proxy="https://your-project.supabase.co/functions/v1/translate"
+  data-default="en"
+  data-element="content"
+  data-exclude="th,ar"
+  defer
+></script>
+```
+
+## Configuration
+
+### React `<TranslationWidget>` props
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `defaultLang` | string | `'zh'` | Initial language code |
-| `apiUrl` | string | Public API | Custom translation API URL |
-| `apiKey` | string | undefined | API key for authentication |
-| `targetElementId` | string | `'translatable-content'` | ID of element to translate |
-| `position` | string | `'top-right'` | Widget position (top-left, top-right, bottom-left, bottom-right) |
-| `onLanguageChange` | function | undefined | Callback when language changes |
-| `localLanguages` | array | [] | Languages with pre-translated content |
+| `proxyUrl` | string | — (required) | Translate Edge Function URL |
+| `token` | string | undefined | Shared widget token; sent as `X-Widget-Token` (must match `WIDGET_TOKEN`) |
+| `defaultLang` | string | `'zh'` | Language the page content is written in (the "original") |
+| `targetElementId` | string | `'translatable-content'` | ID of the element to translate |
+| `position` | string | `'top-right'` | `top-left` \| `top-right` \| `bottom-left` \| `bottom-right` |
+| `includeLanguages` | string[] | undefined | Allowlist of language codes to show |
+| `excludeLanguages` | string[] | undefined | Blocklist of language codes to hide |
+| `onLanguageChange` | function | undefined | Callback `(lang) => void` when language changes |
 
-## Advanced Features
+### `widget.js` `data-*` attributes
 
-### Preventing Translation
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `data-proxy` | — (required) | Translate Edge Function URL |
+| `data-token` | `''` | Shared widget token (`X-Widget-Token`) |
+| `data-default` | `'en'` | Original language of the page |
+| `data-element` | whole page | ID of the element to translate |
+| `data-languages` | all | Comma-separated allowlist of codes (e.g. `en,th,zh`) |
+| `data-exclude` | none | Comma-separated blocklist of codes (e.g. `th,ar`) |
+| `data-concurrency` | `5` | Parallel translation requests |
 
-Add `data-no-translate` attribute to elements that should not be translated:
+## Preventing translation
+
+Add `data-no-translate` to any element (and its subtree) that must stay untranslated:
 
 ```html
 <button data-no-translate>Original Text</button>
-<div data-no-translate>
-  <!-- This entire section will not be translated -->
-</div>
+<div data-no-translate><!-- skipped entirely --></div>
 ```
 
-### Local Language Support
+## Dynamic content
 
-For better performance and to avoid API rate limits, provide pre-translated content for specific languages:
+The widget snapshots text nodes on init, then keeps watching the target element with a `MutationObserver`. Content that mounts later — FAQ accordion answers, modals, tabs, lazily loaded sections — is captured and translated into the language currently shown, so dynamic pages stay fully translated.
 
-```tsx
-function App() {
-  const [localLang, setLocalLang] = useState<'zh' | 'en' | 'es'>('en');
+## Supported languages
 
-  return (
-    <>
-      <TranslationWidget
-        defaultLang="en"
-        onLanguageChange={(lang) => {
-          if (lang === 'zh' || lang === 'en' || lang === 'es') {
-            setLocalLang(lang);
-          }
-        }}
-        localLanguages={['zh', 'en', 'es']}
-      />
-      {localLang === 'zh' ? (
-        <ChineseContent />
-      ) : localLang === 'es' ? (
-        <SpanishContent />
-      ) : (
-        <EnglishContent />
-      )}
-    </>
-  );
-}
+~50 curated languages, each with a native name. The canonical list is `src/languages.ts` (mirrored into `public/widget.js`, kept in sync by a drift test):
+
+```
+en English   zh Chinese   es Spanish   hi Hindi   ar Arabic   bn Bengali
+pt Portuguese ru Russian   ja Japanese  de German  fr French   ko Korean
+it Italian   tr Turkish   vi Vietnamese th Thai    id Indonesian pl Polish
+uk Ukrainian nl Dutch     fa Persian   he Hebrew  ur Urdu     ms Malay
+fil Filipino sw Swahili   ro Romanian  el Greek   cs Czech    hu Hungarian
+sv Swedish   da Danish    fi Finnish   no Norwegian sk Slovak  bg Bulgarian
+hr Croatian  sr Serbian   lt Lithuanian sl Slovenian et Estonian lv Latvian
+ta Tamil     te Telugu    ml Malayalam kn Kannada  mr Marathi  gu Gujarati
+pa Punjabi   my Burmese   km Khmer     ne Nepali
 ```
 
-**Benefits of Local Languages:**
-- Instant language switching with zero latency
-- No API calls or rate limiting issues
-- Better SEO with pre-rendered content
-- Improved user experience
+RTL languages (`ar`, `he`, `fa`, `ur`) set `dir="rtl"` in the standalone widget.
 
-### Custom Translation API
+> Codes are sent to the model as full English names (e.g. `my` → "Burmese") to avoid ambiguous ISO codes — `my` is Burmese in ISO 639-1 but also Malaysia's country code.
 
-Configure the widget to use your own translation service:
+## Environment variables
 
-```tsx
-<TranslationWidget
-  apiUrl="https://your-api.com/translate"
-  apiKey="your-api-key"
-  defaultLang="zh"
-/>
-```
+**Client (Vite — exposed in the bundle, safe to be public):**
 
-## Architecture
+| Var | Description |
+|-----|-------------|
+| `VITE_TRANSLATE_PROXY_URL` | Translate Edge Function URL |
+| `VITE_TRANSLATE_TOKEN` | Optional shared token; must match `WIDGET_TOKEN` |
 
-### Translation Flow
+**Proxy secrets (`supabase secrets set` — never in the client):**
 
-1. **DOM Analysis**: TreeWalker API extracts all visible text nodes
-2. **Batch Translation**: Text sent to translation API in optimized batches
-3. **Smart Caching**: Translations cached for instant switching
-4. **Precise Updates**: Direct text node updates preserve DOM structure
+| Var | Description |
+|-----|-------------|
+| `OPENROUTER_API_KEY` | Your OpenRouter API key |
+| `OPENROUTER_MODEL` | Model id, e.g. `google/gemini-2.5-flash` |
+| `ALLOWED_ORIGINS` | Comma-separated origin allowlist |
+| `WIDGET_TOKEN` | Optional shared token clients must send |
 
-### Key Components
+See `.env.example`.
 
-- **TranslationService** (`src/services/translation.ts`): API communication and caching
-- **DOMTranslator** (`src/services/domTranslator.ts`): DOM traversal and text replacement
-- **TranslationWidget** (`src/components/TranslationWidget.tsx`): Main UI widget
-- **CookieConsent** (`src/components/CookieConsent.tsx`): GDPR-compliant cookie banner
-- **NotFound** (`src/components/NotFound.tsx`): Custom 404 error page
-- **DemoContent** (`src/components/DemoContent.tsx`): Chinese demo page (local language)
-- **DemoContentEnglish** (`src/components/DemoContentEnglish.tsx`): English demo page (local language)
-- **DemoContentSpanish** (`src/components/DemoContentSpanish.tsx`): Spanish demo page (local language)
-
-## SEO Features
-
-### Meta Tags
-- Comprehensive SEO meta tags (title, description, keywords, author)
-- Open Graph tags for Facebook sharing
-- Twitter Card support for social previews
-- Canonical links to prevent duplicate content
-
-### Structured Data
-- JSON-LD schema for search engines
-- SoftwareApplication type with ratings and features
-- Proper semantic HTML structure
-
-### Search Engine Support
-- sitemap.xml for crawler indexing
-- robots.txt with proper directives
-- Mobile-friendly meta viewport
-
-## Accessibility
-
-### WCAG Compliance
-- Proper ARIA labels and roles
-- Keyboard navigation support
-- Screen reader friendly
-- Skip-to-main-content link
-- Sufficient color contrast (WCAG AA compliant)
-
-### Interactive Elements
-- Focus indicators
-- ARIA live regions for dynamic content
-- Progress indicators with ARIA attributes
-- Semantic HTML landmarks
-
-## Supported Languages
-
-| Language | Code | Native Name | Local Component |
-|----------|------|-------------|-----------------|
-| Chinese | zh | 中文 | ✅ Pre-translated |
-| English | en | English | ✅ Pre-translated |
-| Spanish | es | Español | ✅ Pre-translated |
-| French | fr | Français | Via API |
-| German | de | Deutsch | Via API |
-| Japanese | ja | 日本語 | Via API |
-| Korean | ko | 한국어 | Via API |
-| Arabic | ar | العربية | Via API |
-| Hindi | hi | हिन्दी | Via API |
-| Portuguese | pt | Português | Via API |
-
-**Note:** Languages with pre-translated local components provide instant switching without API calls, avoiding rate limits and ensuring the best user experience.
-
-## Performance
-
-### Optimization Features
-- DNS prefetch for Google Fonts
-- Preconnect hints for faster resource loading
-- Smart caching reduces API calls
-- Batch processing minimizes network overhead
-- Instant language switching after initial load
-
-### Performance Tips
-1. Use specific target elements instead of translating entire page
-2. Leverage local language support for instant switching
-3. Pre-translate critical content for best UX
-4. Monitor cache usage with TranslationDebug component
-
-## Demo Site Features
-
-The included demo site showcases a complete, production-ready landing page:
-
-### Navigation
-- Clean, modern header with navigation links
-- Skip-to-main-content for accessibility
-- Mobile-responsive menu
-
-### Hero Section
-- Eye-catching hero with call-to-action
-- GitHub repository links
-- Live translation demo
-
-### Features Section
-- Four feature cards highlighting capabilities
-- Icons from Lucide React
-- Responsive grid layout
-
-### Pro Version Section
-- AI model showcase with icons
-- Feature comparison table
-- Pricing information
-
-### Use Cases
-- Industry-specific examples
-- Real-world applications
-- E-commerce, education, healthcare, finance, and more
-
-### FAQ Section
-- Interactive accordion
-- Common questions answered
-- Smooth animations
-
-### Footer
-- Legal links (Privacy Policy, Terms, Cookie Policy)
-- Project credits
-- Social links
-
-## Legal Compliance
-
-### Cookie Consent
-- GDPR-compliant banner
-- Accept/decline options
-- Link to privacy policy
-- LocalStorage persistence
-
-### Legal Pages
-- Privacy Policy link
-- Terms of Service link
-- Cookie Policy link
-- All accessible from footer
-
-## Browser Support
-
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
-- Mobile browsers (iOS Safari, Chrome Mobile)
-
-## Troubleshooting
-
-### Rate Limit Errors
-
-If you encounter "Slowdown: 10 per 1 minute" errors:
-
-1. **Use Local Languages**: For Chinese, English, and Spanish, the app uses pre-translated components that don't make API calls
-2. **Self-Host LibreTranslate**: Run your own instance for unlimited translations
-3. **Enable Caching**: Once content is cached, switching back won't trigger API calls
-4. **Custom API**: Configure your own translation service endpoint
-
-### Performance Issues
-
-1. Target specific elements with `targetElementId` instead of translating the entire page
-2. Use `data-no-translate` to skip elements that don't need translation
-3. Leverage local language support for frequently accessed languages
-
-## Development
-
-### Project Structure
+## Project structure
 
 ```
 src/
 ├── components/
-│   ├── AIModelIcons.tsx       # AI model icons
-│   ├── CookieConsent.tsx      # GDPR cookie banner
-│   ├── DemoContent.tsx        # Chinese demo page (local)
-│   ├── DemoContentEnglish.tsx # English demo page (local)
-│   ├── DemoContentSpanish.tsx # Spanish demo page (local)
-│   ├── NotFound.tsx           # 404 error page
-│   ├── TranslationDebug.tsx   # Debug component
-│   └── TranslationWidget.tsx  # Main widget
+│   ├── TranslationWidget.tsx   # main React widget
+│   ├── TranslationDebug.tsx    # dev-only debug panel
+│   ├── DemoContentEnglish.tsx  # demo landing page
+│   ├── CookieConsent.tsx       # GDPR cookie banner
+│   └── NotFound.tsx            # 404 page
 ├── services/
-│   ├── domTranslator.ts       # DOM translation logic
-│   └── translation.ts         # API service
-├── App.tsx                     # Main app component
-└── index.css                   # Global styles
+│   ├── translation.ts          # proxy client + cache
+│   └── domTranslator.ts        # DOM walking, batching, MutationObserver
+├── languages.ts                # canonical language list + helpers
+└── App.tsx
 
 public/
-├── robots.txt                  # Search engine directives
-├── sitemap.xml                 # Site structure
-└── standalone-widget.html      # Standalone example
+└── widget.js                   # standalone <script> embed
+
+supabase/functions/translate/
+├── index.ts                    # Edge Function (CORS, auth, OpenRouter call)
+└── lib.ts                      # validation, prompt builder, output parser
 ```
 
-### Build Commands
+## Build commands
 
 ```bash
-# Development
-npm run dev
-
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
-
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
+npm run dev        # development server
+npm run build      # production build
+npm run preview    # preview the build
+npm run typecheck  # tsc --noEmit
+npm run lint       # eslint
+npm test           # vitest run
 ```
+
+## Troubleshooting
+
+- **Translations are slow**: pick a fast model via `OPENROUTER_MODEL` and, where supported, disable reasoning tokens (the proxy already sends `reasoning: { enabled: false }`, which works on models where thinking is optional, e.g. Gemini 2.5 Flash; some models make thinking mandatory).
+- **Part of the page is translated, the rest stays original**: a batch that the model returns unusable is left untranslated; the widget bisects and retries, and re-selecting the language retries any remaining items.
+- **A language translates into the wrong language**: ensure the proxy is redeployed — codes are resolved to full English names server-side.
+- **`401`/`403` from the proxy**: check `ALLOWED_ORIGINS` includes your site's origin and that `WIDGET_TOKEN` (if set) matches the client token.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+Contributions are welcome — open an issue or PR.
 
 ## License
 
-MIT License - feel free to use in personal and commercial projects.
+MIT License — free to use in personal and commercial projects.
 
 ## Credits
 
 Built with:
-- [LibreTranslate](https://github.com/LibreTranslate/LibreTranslate) - Free, open-source translation API
-- [React](https://react.dev/) - UI framework
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
-- [Lucide React](https://lucide.dev/) - Beautiful icons
-- [Vite](https://vitejs.dev/) - Build tool
+- [OpenRouter](https://openrouter.ai/) — unified LLM API for translation
+- [Supabase Edge Functions](https://supabase.com/docs/guides/functions) — serverless key-holding proxy
+- [React](https://react.dev/) · [TypeScript](https://www.typescriptlang.org/) · [Tailwind CSS](https://tailwindcss.com/) · [Lucide React](https://lucide.dev/) · [Vite](https://vitejs.dev/)
 
-## SEO Keywords & Tags
+## Acknowledgements
 
-**Primary Keywords:** open source AI website translator widget 2026, Google Translate alternative, free translation widget, website localization tool, multilingual website builder
+Huge thanks to **[@aceman23](https://github.com/aceman23)** and **Hybrid Ads.ai** for the original open-source website translator, [OpenTranslateAI_OpenSourceWebsiteTranslator_US](https://github.com/aceman23/OpenTranslateAI_OpenSourceWebsiteTranslator_US). This fork builds on their landing page, SEO scaffolding, and React widget foundation, re-platforming the translation engine onto OpenRouter + a serverless proxy. 🙏
 
-**Secondary Keywords:** React translation component, TypeScript translation library, self-hosted translator, privacy-focused translation, GDPR compliant translator, LibreTranslate integration, website internationalization, i18n React component, language switcher widget, multi-language website solution
+## SEO Keywords
 
-**Technology Tags:** React, TypeScript, Vite, Tailwind CSS, LibreTranslate, AI Translation, OpenAI GPT-4, Claude AI, DeepSeek, Qwen AI, Web Development, Frontend, JavaScript
-
-**Use Cases:** e-commerce translation, educational website localization, healthcare website translation, SaaS internationalization, multi-language blog, global website builder
-
-## Support
-
-For issues, questions, or contributions, please visit:
-- [GitHub Repository](https://github.com/aceman23/OpenTranslateAI_OpenSourceWebsiteTranslator_US)
-- [Issue Tracker](https://github.com/aceman23/OpenTranslateAI_OpenSourceWebsiteTranslator_US/issues)
-- [Live Demo](https://opentranslateai.com)
-
----
-
-Created and maintained by **Hybrid Ads.ai**
-
-**Tags:** `react` `typescript` `translation` `i18n` `localization` `multilingual` `open-source` `google-translate-alternative` `libretranslate` `website-translator` `ai-translation` `widget` `seo` `accessibility` `gdpr` `privacy` `self-hosted` `free` `2026`
+open source AI website translator widget, Google Translate alternative, OpenRouter translation, self-hosted translation proxy, React translation component, TypeScript i18n, language switcher widget, embeddable website translator, GDPR-compliant translation, multilingual website
