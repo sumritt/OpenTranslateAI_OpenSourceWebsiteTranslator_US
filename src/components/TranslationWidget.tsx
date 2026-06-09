@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Globe, Loader2, Check, AlertCircle } from 'lucide-react';
 import { TranslationService } from '../services/translation';
 import { DOMTranslator } from '../services/domTranslator';
-import { LANGUAGES, computeLanguages } from '../languages';
+import { LANGUAGES, computeLanguages, matchLanguage } from '../languages';
 
 interface TranslationWidgetProps {
   defaultLang?: string;
@@ -45,6 +45,16 @@ export function TranslationWidget({
         defaultLang,
       }),
     [includeLanguages, excludeLanguages, defaultLang],
+  );
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('');
+  }, [isOpen]);
+
+  const visibleLanguages = availableLanguages.filter((lang) =>
+    matchLanguage(lang, searchQuery),
   );
 
   useEffect(() => {
@@ -200,13 +210,16 @@ export function TranslationWidget({
           <div className={`absolute top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 p-4 z-[100] ${
             position.includes('right') ? 'right-0' : 'left-0'
           }`}>
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Select Language
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 w-[320px] max-w-[calc(100vw-2rem)]">
-              {availableLanguages.map((lang) => {
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search language…"
+              autoFocus
+              className="w-full mb-3 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="grid grid-cols-2 gap-2 w-[320px] max-w-[calc(100vw-2rem)] max-h-72 overflow-y-auto">
+              {visibleLanguages.map((lang) => {
                 const isLocal = localLanguages.includes(lang.code);
                 const isCached = cachedLanguages.includes(lang.code);
                 const showInstantBadge = isLocal || isCached;
@@ -248,6 +261,9 @@ export function TranslationWidget({
                   </button>
                 );
               })}
+              {visibleLanguages.length === 0 && (
+                <p className="col-span-2 text-xs text-gray-400 py-2 px-1">No languages found</p>
+              )}
             </div>
           </div>
         )}
