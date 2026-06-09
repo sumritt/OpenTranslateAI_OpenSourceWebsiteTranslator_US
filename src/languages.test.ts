@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LANGUAGES, RTL_CODES, matchLanguage } from './languages';
+import { LANGUAGES, RTL_CODES, matchLanguage, computeLanguages } from './languages';
 
 describe('LANGUAGES', () => {
   it('has unique codes', () => {
@@ -50,5 +50,40 @@ describe('matchLanguage', () => {
   });
   it('returns false when nothing matches', () => {
     expect(matchLanguage(en, 'xyz')).toBe(false);
+  });
+});
+
+describe('computeLanguages', () => {
+  const A = { code: 'a', name: 'Alpha', nativeName: 'Alpha' };
+  const B = { code: 'b', name: 'Beta', nativeName: 'Beta' };
+  const C = { code: 'c', name: 'Gamma', nativeName: 'Gamma' };
+  const ALL = [A, B, C];
+
+  it('returns all when no include/exclude', () => {
+    expect(computeLanguages({ all: ALL, defaultLang: 'a' })).toEqual([A, B, C]);
+  });
+  it('include keeps only listed, in canonical order', () => {
+    expect(computeLanguages({ all: ALL, include: ['c', 'a'], defaultLang: 'a' })).toEqual([A, C]);
+  });
+  it('empty include array is treated as all', () => {
+    expect(computeLanguages({ all: ALL, include: [], defaultLang: 'a' })).toEqual([A, B, C]);
+  });
+  it('exclude removes listed', () => {
+    expect(computeLanguages({ all: ALL, exclude: ['b'], defaultLang: 'a' })).toEqual([A, C]);
+  });
+  it('include defines the base, exclude removes from it', () => {
+    expect(
+      computeLanguages({ all: ALL, include: ['a', 'b'], exclude: ['a'], defaultLang: 'b' }),
+    ).toEqual([B]);
+  });
+  it('re-adds the default language when it was excluded', () => {
+    const res = computeLanguages({ all: ALL, exclude: ['a'], defaultLang: 'a' });
+    expect(res[0]).toEqual(A);
+    expect(res.map((l) => l.code)).toEqual(['a', 'b', 'c']);
+  });
+  it('falls back to a bare entry when default is not in all', () => {
+    const res = computeLanguages({ all: ALL, include: ['b'], defaultLang: 'zz' });
+    expect(res[0]).toEqual({ code: 'zz', name: 'zz', nativeName: 'zz' });
+    expect(res.map((l) => l.code)).toEqual(['zz', 'b']);
   });
 });

@@ -70,3 +70,24 @@ export function matchLanguage(lang: Language, query: string): boolean {
     lang.nativeName.toLowerCase().includes(q)
   );
 }
+
+export function computeLanguages(opts: {
+  all: Language[];
+  include?: string[];
+  exclude?: string[];
+  defaultLang: string;
+}): Language[] {
+  const { all, include, exclude, defaultLang } = opts;
+  const base = include && include.length
+    ? all.filter((l) => include.includes(l.code))
+    : all;
+  const excluded = new Set(exclude ?? []);
+  const filtered = base.filter((l) => !excluded.has(l.code));
+  if (!filtered.some((l) => l.code === defaultLang)) {
+    const dl =
+      all.find((l) => l.code === defaultLang) ??
+      { code: defaultLang, name: defaultLang, nativeName: defaultLang };
+    return [dl, ...filtered];
+  }
+  return filtered;
+}
