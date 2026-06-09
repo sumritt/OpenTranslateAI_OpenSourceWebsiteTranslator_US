@@ -4,8 +4,10 @@ import {
   isOriginAllowed,
   parseAllowedOrigins,
   DEFAULT_CAPS,
+  LANGUAGE_NAMES,
 } from './lib';
 import { buildMessages, parseTranslations } from './lib';
+import { LANGUAGES } from '../../../src/languages';
 
 describe('validateRequest', () => {
   it('accepts a valid batch', () => {
@@ -83,6 +85,33 @@ describe('buildMessages', () => {
 
   it('mentions auto-detection when no source given', () => {
     expect(buildMessages(['hi'], 'th')[0].content.toLowerCase()).toContain('detect');
+  });
+
+  it('resolves an ISO code target to its full English name', () => {
+    // 'my' is Burmese in ISO 639-1, but is also Malaysia's country code; a model
+    // told to translate "into my" tends to produce Malay. The full name removes
+    // the ambiguity.
+    const content = buildMessages(['hi'], 'my')[0].content;
+    expect(content).toContain('Burmese');
+    expect(content).not.toContain('into my.');
+  });
+
+  it('resolves the source code to its full English name too', () => {
+    const content = buildMessages(['hi'], 'th', 'ms')[0].content;
+    expect(content).toContain('Thai');
+    expect(content).toContain('Malay');
+  });
+
+  it('falls back to the raw target when the code is unknown', () => {
+    expect(buildMessages(['hi'], 'xx')[0].content).toContain('xx');
+  });
+});
+
+describe('LANGUAGE_NAMES', () => {
+  it('has a full English name for every language code the UI can send', () => {
+    for (const lang of LANGUAGES) {
+      expect(LANGUAGE_NAMES[lang.code]).toBe(lang.name);
+    }
   });
 });
 

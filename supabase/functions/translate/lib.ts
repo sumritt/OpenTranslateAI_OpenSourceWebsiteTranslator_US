@@ -65,11 +65,35 @@ export interface ChatMessage {
   content: string;
 }
 
+// Maps the ISO codes the UI sends to unambiguous English language names for the
+// prompt. Bare codes mislead the model: 'my' is Burmese in ISO 639-1 but also
+// Malaysia's country code, so "translate into my" yields Malay. Keep in sync
+// with src/languages.ts LANGUAGES (guarded by a test).
+export const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English', zh: 'Chinese', es: 'Spanish', hi: 'Hindi', ar: 'Arabic',
+  bn: 'Bengali', pt: 'Portuguese', ru: 'Russian', ja: 'Japanese', de: 'German',
+  fr: 'French', ko: 'Korean', it: 'Italian', tr: 'Turkish', vi: 'Vietnamese',
+  th: 'Thai', id: 'Indonesian', pl: 'Polish', uk: 'Ukrainian', nl: 'Dutch',
+  fa: 'Persian', he: 'Hebrew', ur: 'Urdu', ms: 'Malay', fil: 'Filipino',
+  sw: 'Swahili', ro: 'Romanian', el: 'Greek', cs: 'Czech', hu: 'Hungarian',
+  sv: 'Swedish', da: 'Danish', fi: 'Finnish', no: 'Norwegian', sk: 'Slovak',
+  bg: 'Bulgarian', hr: 'Croatian', sr: 'Serbian', lt: 'Lithuanian',
+  sl: 'Slovenian', et: 'Estonian', lv: 'Latvian', ta: 'Tamil', te: 'Telugu',
+  ml: 'Malayalam', kn: 'Kannada', mr: 'Marathi', gu: 'Gujarati', pa: 'Punjabi',
+  my: 'Burmese', km: 'Khmer', ne: 'Nepali',
+};
+
+export function languageName(code: string): string {
+  return LANGUAGE_NAMES[code] ?? code;
+}
+
 export function buildMessages(texts: string[], target: string, source?: string): ChatMessage[] {
+  const targetName = languageName(target);
+  const sourceName = source ? languageName(source) : undefined;
   const system = [
     'You are a translation engine.',
-    `Translate every string in the user's JSON array into ${target}.`,
-    source ? `The source language is ${source}.` : 'Detect the source language automatically.',
+    `Translate every string in the user's JSON array into ${targetName}.`,
+    sourceName ? `The source language is ${sourceName}.` : 'Detect the source language automatically.',
     'Return ONLY a JSON array of strings, the same length and order as the input.',
     'Do not add commentary, keys, or code fences. Do not merge or split items.',
     'Preserve numbers, URLs, emails, and any text already in the target language.',
