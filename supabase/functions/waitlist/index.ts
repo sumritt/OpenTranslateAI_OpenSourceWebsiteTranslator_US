@@ -6,21 +6,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const GOOGLE_SHEET_ID = "1n_cp2Dhp0Ip5nFdZxNAWrKGZ78cj2BGrAdkjhbLxmLc";
-
-const GOOGLE_CREDENTIALS = {
-  type: "service_account",
-  project_id: "opentranslateai",
-  private_key_id: "ca1d6dcc20eb55e6d3e5bd6a9dc95e08da749322",
-  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCl+IA+rZjUW19R\nhHsJGu5FCmAunAnmU5FwRavFNhlgoKoE6Lt7RyBNKKWsKsqJUGt79S+XcwZHL+lu\njTI6L04qwEA14ky1vfNHGutSZ68iQEBfPAUBi7XQKOVrPH78M6VvWI/dMsLoQaeH\nC9uHKRQ9lQtKhu4Wd2qQ+hnNnuJchoa2D0v0JidnRcpuMlevRAPkNtM8frPGxrRw\nLUsDFCEKS1Weq/xrscBIOCsrHUAV9Kro7vn8wc4NzXBdSFE8fm7T2STVEhsVsj9S\nYSwu8FhFNXASX6xqcyGYX/kN6FQ19NZobaL2CIq+l89utKDhB9CuOd2JKr9CrcB4\naL4iDH+/AgMBAAECggEAGtfLqhd6kdHrYyxJl+nmonzwnGk5Qqq+aYmjI+TBivrB\nNMUNWX1h8IjD7soG8tlyYNyBY33DhKzvlKU6e+Wdv1VTrUNaA8TifVwRtkS1sxTw\nNFbpOlxFvhJ3NHZW1WRm+9C3h9+HXXgM588XpM8Uinc6GcYj6LdMoYEJvlNVqgAG\n94zmJJyuR1oEFD2Obuse7V07WPYlzkk0pNUEZAdbeCvLNcE8NrnTiJCe4xBTSuXT\nS2D7Q/QNu11dh739s4W84N9IZVJAXBWdPCawiCQgzptVBj6f7dl/V10Bp6kBClNL\nSEUD6y6t/U5gAD0jqGavkMjcd8h4lxVlplPqtq41KQKBgQDjVhexDO9+Sxxqb7E1\n5KtgDQ7oP6JKxk7t7gTNxCyCkz8py4TIeg0KkcKrDE/edlk72Ha+wXTb//6NDe9R\nsKcMYg4PlMk2sHiSX/OY03yLnDOAz3tE6rxXx0YDZuqKMswDM2FwKYSYWkbdXtYZ\nksISDjcjKPGDw3OJ83YCB6aZRwKBgQC65aoPZoX9oSLIe2Emg4Pu7fzl3/mm4Y2M\n20Ns7gy3djU7i/Ep0zwmMQ0dx9mCWBohixVG3Mknu+HHA2BzVL1mOL3/iS8qc9aC\n8KqwI3bFezlTAe57zKDLE3mZ9HSQcBn4CaCJNdQE2Co46+QuwExWxZS7vKrJV0GJ\nmNkPY6QhyQKBgA79ISjCQpQgHaqC3LtB7W6yzbXQZEHr205isBxk/85IKRT3XzTc\nnzmALMacVDPFt9JzTjj7hlnvAfiI36uSKyFs4aJzW+ToM7rq6qO75e1KijbG90iu\n9WYQNHSK95HPEZZwb882XZCx+xQjaZhcDcGlAEuoKmxWmaqRy8kMehaHAoGAFLCN\n9ex8kso+xoDaDWBrv4x6/Zug0HeRqvEu8qUbpUehtvjT9rRaqUOu1wgjrQlBw0rZ\nTSHt5scmxFg8WigcW2+WoO432XQ/X/lye9NBN7VfcC/7jZrmhfSe9osYSFEQnuO5\n8NaTpQGlEu4SMZa6HLT8tRe6tFVDfQ79oHWAWvkCgYEAg/SUDCHUQ6oM6Qavc1Q3\nOv3ZhAfowYBuPagBRocUHbKTAres5dzFyD/GmiOUc61cyWBEYH+VNBYGgkQV8qmu\neQ5NzqNh6HaPb2D6btR2gnoWc7eNmmf2PPLZES2Hb/4M4NAxazKkfk2hTzcOemrl\n6jdyMO0IhiLW833vOAXTEN4=\n-----END PRIVATE KEY-----\n",
-  client_email: "opentranslateai@opentranslateai.iam.gserviceaccount.com",
-  client_id: "103446003722317646209",
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/opentranslateai%40opentranslateai.iam.gserviceaccount.com",
-  universe_domain: "googleapis.com"
-};
+// Service-account credentials are loaded from the GOOGLE_SERVICE_ACCOUNT secret
+// (the full service-account JSON, set via `supabase secrets set`). Never hardcode
+// the private key in source — it would be committed to git and leak.
+function loadServiceAccount(): { client_email: string; private_key: string } | null {
+  const raw = Deno.env.get("GOOGLE_SERVICE_ACCOUNT");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.client_email === "string" &&
+      typeof parsed.private_key === "string"
+    ) {
+      return { client_email: parsed.client_email, private_key: parsed.private_key };
+    }
+  } catch {
+    // malformed JSON — treated as "not configured" below
+  }
+  return null;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -48,8 +53,19 @@ Deno.serve(async (req: Request) => {
 
     const timestamp = new Date().toISOString();
 
-    const serviceAccountEmail = GOOGLE_CREDENTIALS.client_email;
-    const privateKey = GOOGLE_CREDENTIALS.private_key;
+    const sheetId = Deno.env.get("GOOGLE_SHEET_ID");
+    const credentials = loadServiceAccount();
+    if (!sheetId || !credentials) {
+      return new Response(
+        JSON.stringify({ error: "Server not configured" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    const serviceAccountEmail = credentials.client_email;
+    const privateKey = credentials.private_key;
 
     // Create JWT for Google API authentication
     const header = {
@@ -127,7 +143,7 @@ Deno.serve(async (req: Request) => {
 
     // Append row to Google Sheet
     const sheetsResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/Sheet1:append?valueInputOption=USER_ENTERED`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1:append?valueInputOption=USER_ENTERED`,
       {
         method: "POST",
         headers: {
